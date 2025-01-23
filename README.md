@@ -33,6 +33,7 @@ Most features are using inspiration and implementation ideas from  **[EpicSentry
 2. Titanfall
 3. Apex legends
 4. Team fortress 2
-And more to come in the future!
+5. CSGO
+6. Left 4 dead 2
 
 
