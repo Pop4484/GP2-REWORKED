@@ -28,3 +28,11 @@ Actually, you can consider codebase as trash, but clean code isn't a priority at
 # Credits
 Most features are using inspiration and implementation ideas from  **[EpicSentry/P2ASW](https://github.com/EpicSentry/P2ASW)**.
 
+# Future Projects
+1. Black mesa
+2. Titanfall
+3. Apex legends
+4. Team fortress 2
+And more to come in the future!
+
+
