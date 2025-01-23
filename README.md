@@ -35,5 +35,6 @@ Most features are using inspiration and implementation ideas from  **[EpicSentry
 4. Team fortress 2
 5. CSGO
 6. Left 4 dead 2
+7. High energy heroes (Chinese apex legends mobile rebranded)
 
 
