@@ -10,6 +10,8 @@ SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = false
 SWEP.Spawnable = true
 
+SWEP.BobScale = 0 // Required for custom viewbob
+
 SWEP.ViewModel = "models/weapons/v_portalgun.mdl"
 SWEP.WorldModel = "models/weapons/w_portalgun.mdl"
 SWEP.ViewModelFOV = 50
@@ -321,6 +323,7 @@ function SWEP:Holster(arguments)
 		end
 
 		timer.Simple(0, function()
+			if !IsValid(self) then return end // Stop erroring on death!
 			print('Holster')
 
 			if IsValid(vm1) and IsValid(owner:GetEntityInUse()) then
@@ -455,6 +458,7 @@ function SWEP:Think()
 
 		if owner:KeyPressed(IN_USE) then
 			self:SendWeaponAnim(ACT_VM_FIZZLE)
+			self:EmitSound("PortalPlayer.UseDeny")
 			self.NextIdleTime = CurTime() + 0.5
 		end
 
@@ -605,6 +609,8 @@ function SWEP:ViewModelDrawn(vm)
 		end
 	end
 
+	if vm0:GetModel() != vm1:GetModel() then return end // Fix stupid holding particle bug
+
 	-- Holding particle for second vm
 	if vm == vm1 then
 		if not self.FirstPersonMuzzleAttachment then
@@ -710,4 +716,108 @@ function SWEP:Reload()
 
 	self:SendWeaponAnim(ACT_VM_FIZZLE)
 	self.NextIdleTime = CurTime() + 0.5
+end
+
+// Viewbob Code, because why not? (Ported from P2ASW)
+local g_lateralBob, g_verticalBob = 0,0
+local HL2_BOB_CYCLE_MIN,HL2_BOB_CYCLE_MAX,HL2_BOB,HL2_BOB_UP = 1,.45,.002,.5
+local bobtime,lastbobtime = 0,0
+
+local function CalcViewmodelBob(self)
+	local cycle = 0
+
+	local plr = self:GetOwner():IsPlayer() && self:GetOwner()
+	if !plr then return end
+
+	local speed = plr:GetVelocity():Length2D()
+
+	local maxSpeed = math.max(plr:GetRunSpeed(),plr:GetWalkSpeed())
+
+	speed = math.Clamp(speed,-maxSpeed,maxSpeed)
+
+	local boboffset = math.Remap(speed,0,maxSpeed,0,1)
+
+	bobtime = bobtime + (CurTime()-lastbobtime)*boboffset
+	lastbobtime = CurTime()
+
+
+    // Vertical Bob
+    cycle = bobtime - math.floor(bobtime/HL2_BOB_CYCLE_MAX)*HL2_BOB_CYCLE_MAX
+	cycle = cycle / HL2_BOB_CYCLE_MAX
+
+	if cycle < HL2_BOB_UP then
+		cycle = math.pi * cycle / HL2_BOB_UP
+	else
+		cycle = math.pi+math.pi*(cycle-HL2_BOB_UP)/(1-HL2_BOB_UP)
+	end
+
+	g_verticalBob = speed*.005
+	g_verticalBob = g_verticalBob*.3 + g_verticalBob*.7*math.sin(cycle)
+
+	g_verticalBob = math.Clamp(g_verticalBob,-7,4)
+
+    // Lateral Bob
+
+	cycle = bobtime - math.floor(bobtime/HL2_BOB_CYCLE_MAX*2)*HL2_BOB_CYCLE_MAX*2
+	cycle = cycle / (HL2_BOB_CYCLE_MAX*2)
+
+	if cycle < HL2_BOB_UP then
+		cycle = math.pi * cycle / HL2_BOB_UP
+	else
+		cycle = math.pi+math.pi*(cycle-HL2_BOB_UP)/(1-HL2_BOB_UP)
+	end
+
+	g_lateralBob = speed*.005
+	g_lateralBob = g_lateralBob*.3 + g_lateralBob*.7*math.sin(cycle)
+	g_lateralBob = math.Clamp(g_lateralBob,-7,4)
+end
+
+local function VectorMA(start,scale,dir,dest)
+	dest.x = start.x + scale * dir.x
+	dest.y = start.y + scale * dir.y
+	dest.z = start.z + scale * dir.z
+end
+
+function SWEP:AddViewmodelBob(vm,origin,ang)
+	local forward,right,up = ang:Forward(),ang:Right(),ang:Up()
+
+	CalcViewmodelBob(self)
+
+	/*local plr = self:GetOwner():IsPlayer() && self:GetOwner()
+	if !plr then return end*/
+
+	VectorMA(origin,g_verticalBob*.1,forward,origin)
+
+	origin = origin + (g_verticalBob*.1*forward)
+
+	VectorMA(origin,g_lateralBob*.8,right,origin)
+
+	local rollAngle = g_verticalBob*.5
+	local rotAxis = right:Cross(up):GetNormalized()
+	local rotMatrix = ang
+	rotMatrix:RotateAroundAxis(rotAxis,rollAngle)
+	up = rotMatrix:Up()
+	forward = rotMatrix:Forward()
+	right = rotMatrix:Right()
+
+	local pitchAngle = -g_verticalBob*.4
+	rotAxis = right;
+	rotMatrix:RotateAroundAxis(rotAxis,pitchAngle)
+	up = rotMatrix:Up()
+	forward = rotMatrix:Forward()
+
+	local yawAngle = -g_lateralBob*.3
+	rotAxis = up
+	rotMatrix:RotateAroundAxis(rotAxis,yawAngle)
+	forward = rotMatrix:Forward()
+
+	ang = forward:AngleEx(up)
+
+	return origin,ang
+end
+
+function SWEP:CalcViewModelView(vm,_,_,pos,ang)
+	pos,ang = self:AddViewmodelBob(vm, pos, ang)
+
+	return pos,ang
 end
